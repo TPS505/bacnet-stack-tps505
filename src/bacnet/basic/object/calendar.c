@@ -592,7 +592,6 @@ bool Calendar_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
 {
     bool status = false; /* return value */
     int len = 0;
-    BACNET_APPLICATION_DATA_VALUE value = { 0 };
     int iOffset;
     BACNET_CALENDAR_ENTRY entry;
     bool pv_old;
@@ -602,16 +601,13 @@ bool Calendar_Write_Property(BACNET_WRITE_PROPERTY_DATA *wp_data)
     if (wp_data == NULL) {
         return false;
     }
-    /* decode the some of the request */
-    len = bacapp_decode_application_data(
-        wp_data->application_data, wp_data->application_data_len, &value);
-    /* FIXME: len < application_data_len: more data? */
-    if (len < 0) {
-        /* error while decoding - a value larger than we can handle */
-        wp_data->error_class = ERROR_CLASS_PROPERTY;
-        wp_data->error_code = ERROR_CODE_VALUE_OUT_OF_RANGE;
-        return false;
-    }
+    /* Note: the date-list is a SEQUENCE OF BACnetCalendarEntry, and each entry
+       begins with a context tag ([0] date, [1] dateRange, [2] weekNDay).
+       bacapp_decode_application_data() only accepts application-tagged data,
+       so pre-decoding the request here rejected every valid write with
+       value-out-of-range. The entries are decoded below with
+       bacnet_calendar_entry_decode(), which handles the context tags, and an
+       undecodable entry is reported there as invalid-data-type. */
     switch (wp_data->object_property) {
         case PROP_DATE_LIST:
             pv_old = Calendar_Present_Value(wp_data->object_instance);
