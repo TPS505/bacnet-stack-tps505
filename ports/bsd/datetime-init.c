@@ -7,6 +7,8 @@
  * @section DESCRIPTION
  *
  * This library provides functions for getting and setting the system time.
+ *
+ * @copyright SPDX-License-Identifier: GPL-2.0-or-later WITH GCC-exception-2.0
  */
 #include <stdio.h>
 #include <stdlib.h>
