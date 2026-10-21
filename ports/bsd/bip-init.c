@@ -546,7 +546,8 @@ int bip_get_local_address_ioctl(
 {
     char rv = '\0'; /* return value */
 
-    struct ifaddrs *ifaddrs_ptr;
+    struct ifaddrs *ifaddrs_ptr = NULL;
+    struct ifaddrs *entry;
     void *addr_ptr = NULL;
     int status;
 
@@ -554,13 +555,14 @@ int bip_get_local_address_ioctl(
     if (status == -1) {
         fprintf(
             stderr, "Error in 'getifaddrs': %d (%s)\n", errno, strerror(errno));
+        return rv;
     }
-    while (ifaddrs_ptr) {
-        if ((ifaddrs_ptr->ifa_addr->sa_family == AF_INET) &&
-            (ifname && strcmp(ifaddrs_ptr->ifa_name, ifname) == 0)) {
+    for (entry = ifaddrs_ptr; entry != NULL; entry = entry->ifa_next) {
+        if ((entry->ifa_addr->sa_family == AF_INET) &&
+            (ifname && strcmp(entry->ifa_name, ifname) == 0)) {
             switch (request) {
                 case SIOCGIFADDR:
-                    addr_ptr = get_addr_ptr(ifaddrs_ptr->ifa_addr);
+                    addr_ptr = get_addr_ptr(entry->ifa_addr);
                     break;
                 case SIOCGIFBRDADDR:
                     /*  Depending on whether the bit
@@ -570,15 +572,15 @@ int bip_get_local_address_ioctl(
                         address associated with ifa_addr or ifa_dstaddr
                         will contain the destination address of the
                         point-to-point interface.*/
-                    if (ifaddrs_ptr->ifa_flags & IFF_POINTOPOINT) {
+                    if (entry->ifa_flags & IFF_POINTOPOINT) {
                         BIP_Point_To_Point = true;
-                        addr_ptr = get_addr_ptr(ifaddrs_ptr->ifa_dstaddr);
+                        addr_ptr = get_addr_ptr(entry->ifa_dstaddr);
                     } else {
-                        addr_ptr = get_addr_ptr(ifaddrs_ptr->ifa_broadaddr);
+                        addr_ptr = get_addr_ptr(entry->ifa_broadaddr);
                     }
                     break;
                 case SIOCGIFNETMASK:
-                    addr_ptr = get_addr_ptr(ifaddrs_ptr->ifa_netmask);
+                    addr_ptr = get_addr_ptr(entry->ifa_netmask);
                     break;
                 default:
                     break;
@@ -587,8 +589,9 @@ int bip_get_local_address_ioctl(
                 memcpy(addr, addr_ptr, sizeof(struct in_addr));
             }
         }
-        ifaddrs_ptr = ifaddrs_ptr->ifa_next;
     }
+    /* Free the head of the list, not the cursor: walking the original pointer
+       to the end left nothing to free, which leaked the whole list. */
     freeifaddrs(ifaddrs_ptr);
 
     return rv;
